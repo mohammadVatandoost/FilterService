@@ -16,15 +16,16 @@ const dbName = "Fanap.db"
 const dbDriver = "sqlite3"
 const serverPort = "4567"
 
-type Model struct {
-	ID        uint `gorm:"primary_key"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt *time.Time
-}
+// type Model struct {
+// 	ID        uint `gorm:"primary_key"`
+// 	CreatedAt time.Time
+// 	UpdatedAt time.Time
+// 	DeletedAt *time.Time
+// }
 
 type RectangleModel struct {
-	gorm.Model
+	// gorm.Model
+	Time   string
 	X      int
 	Y      int
 	Width  int
@@ -47,11 +48,6 @@ func (res *ResponseData) UnmarshalJSON(buf []byte) {
 	json.Unmarshal(buf, &res)
 }
 
-// type ResponseData struct {
-// 	main  Rectangle `json:"main"`
-// 	input []interface{} `json:"input"`
-// }
-
 func main() {
 	createTable()
 	fmt.Println("Server Port:", serverPort)
@@ -68,53 +64,20 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "GET":
-		db, err := gorm.Open(dbDriver, dbName)
-		if err != nil {
-			fmt.Println("dataHandler failed to connect database: ", err)
-			os.Exit(1)
-		}
-		defer db.Close()
-		var rectangles []RectangleModel
-		_ = db.Find(&rectangles)
-		res, _ := json.Marshal(rectangles)
-		fmt.Println("res :", string(res))
-		fmt.Fprintf(w, string(res))
-		// http.ServeFile(w, r, "form.html")
+		sendResponse(w, r)
 	case "POST":
-		if err := r.ParseForm(); err != nil {
-			fmt.Fprintf(w, "ParseForm() err: %v", err)
-			return
-		}
-		// fmt.Println("Post request")
-		// fmt.Println(r)
-		// fmt.Println("main:", r.FormValue("main"))
 		body, err := ioutil.ReadAll(r.Body)
 		if err != nil {
-			fmt.Println("getCoinInfo failed to ioutil.ReadAll(resp.Body):", err)
+			fmt.Println("requestHandler failed to ioutil.ReadAll(resp.Body):", err)
 			os.Exit(1)
 		}
 		var data ResponseData
 		data.UnmarshalJSON(body)
-		// var inputs []Rectangle
-		// json.Unmarshal(body, &data)
-		// json.Unmarshal([]byte(data.input, &inputs)
 		dataHandler(data)
-		// fmt.Println("body:", string(body))
-		// fmt.Println("main.width:", data.Main.Width)
-		// for i, v := range data.Input {
-		// 	fmt.Println(i, " data.input:", v)
-		// }
-		// fmt.Println("data.input:", data.Input)
-		// fmt.Println("data.input length:", len(data.Input))
 		fmt.Fprintf(w, "")
-		// // main := r.FormValue("main")
-		// ‫‪input‬‬Array := r.FormValue("input")
-		// fmt.Fprintf(w, "main = %s\n", main)
-		// fmt.Fprintf(w, "‫‪input‬‬ = %s\n", ‫‪input‬‬)
-		// http.Response(w, "", http.StatusOK )
 	default:
 		http.Error(w, "Sorry, only GET and POST methods are supported.", http.StatusNotFound)
-		fmt.Fprintf(w, "Sorry, only GET and POST methods are supported.")
+		fmt.Println("Sorry, only GET and POST methods are supported.")
 	}
 }
 
@@ -129,6 +92,20 @@ func createTable() {
 	db.AutoMigrate(&RectangleModel{})
 }
 
+func sendResponse(w http.ResponseWriter, r *http.Request) {
+	db, err := gorm.Open(dbDriver, dbName)
+	if err != nil {
+		fmt.Println("dataHandler failed to connect database: ", err)
+		os.Exit(1)
+	}
+	defer db.Close()
+	var rectangles []RectangleModel
+	_ = db.Find(&rectangles)
+	res, _ := json.Marshal(rectangles)
+	fmt.Println("res :", string(res))
+	fmt.Fprintf(w, string(res))
+}
+
 func dataHandler(data ResponseData) {
 	db, err := gorm.Open(dbDriver, dbName)
 	if err != nil {
@@ -140,7 +117,8 @@ func dataHandler(data ResponseData) {
 	for _, rec := range data.Input {
 		if checkIsCommon(data.Main, rec) {
 			fmt.Println("Ok:", rec.X, ", ", rec.Y, ", ", rec.Width, ", ", rec.Height)
-			db.Create(&RectangleModel{X: rec.X, Y: rec.Y, Width: rec.Width, Height: rec.Height})
+			db.Create(&RectangleModel{X: rec.X, Y: rec.Y, Width: rec.Width, Height: rec.Height,
+				Time: time.Now().Format("2006-01-02 15:04:05")})
 		}
 	}
 }
@@ -152,7 +130,6 @@ func checkIsCommon(main Rectangle, r Rectangle) bool {
 	return false
 }
 
-
 // {
 // 	"main": {"x": 0, "y": 0, "width": 10, "height": 20},
 // 	"input": [
@@ -161,3 +138,11 @@ func checkIsCommon(main Rectangle, r Rectangle) bool {
 // 		   {"x": -1, "y": -1, "width": 5, "height": 4}
 // 	 ]
 // 	}
+
+// {
+// 	"main": {"x": 3, "y": 2, "width": 5, "height": 10},
+// 	"input": [
+// 	    {"x": 4, "y": 10, "width": 1, "height": 1},
+// 	    {"x": 9, "y": 10, "width": 5, "height": 4}
+// 	]
+// }
